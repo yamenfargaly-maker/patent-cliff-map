@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The 2030 Patent Cliff Map</title>
+<style>
+:root{
+  --surface-1:#fcfcfb; --page:#f9f9f7; --text-primary:#0b0b0b; --text-secondary:#52514e;
+  --muted:#898781; --grid:#e1e0d9; --axis:#c3c2b7;
+  --s1:#2a78d6; --s2:#eb6834; --border:rgba(11,11,11,.10); --wash:rgba(42,120,214,.06);
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){ :root:where(:not([data-theme=light])){
+  --surface-1:#1a1a19; --page:#0d0d0d; --text-primary:#fff; --text-secondary:#c3c2b7;
+  --muted:#898781; --grid:#2c2c2a; --axis:#383835;
+  --s1:#3987e5; --s2:#d95926; --border:rgba(255,255,255,.10); --wash:rgba(57,135,229,.10);
+  color-scheme:dark; }}
+:root[data-theme=dark]{
+  --surface-1:#1a1a19; --page:#0d0d0d; --text-primary:#fff; --text-secondary:#c3c2b7;
+  --muted:#898781; --grid:#2c2c2a; --axis:#383835;
+  --s1:#3987e5; --s2:#d95926; --border:rgba(255,255,255,.10); --wash:rgba(57,135,229,.10);
+  color-scheme:dark; }
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--text-primary);
+  font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding:40px 24px 80px}
+header{margin-bottom:32px}
+h1{font-size:34px;line-height:1.15;margin:0 0 8px;letter-spacing:-.02em;font-weight:650}
+.sub{color:var(--text-secondary);font-size:16px;max-width:74ch;margin:0 0 14px}
+.meta{color:var(--muted);font-size:12.5px;display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+.toggle{margin-left:auto;background:none;border:1px solid var(--border);color:var(--text-secondary);
+  border-radius:6px;padding:5px 11px;font-size:12px;cursor:pointer;font-family:inherit}
+.toggle:hover{background:var(--wash)}
+.card{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;
+  padding:22px 24px;margin-bottom:20px}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+.tile{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;padding:18px 20px}
+.tile .k{font-size:11.5px;text-transform:uppercase;letter-spacing:.055em;color:var(--muted);
+  margin-bottom:9px;font-weight:600}
+.tile .v{font-size:31px;font-weight:650;letter-spacing:-.02em;line-height:1}
+.tile .d{font-size:12.5px;color:var(--text-secondary);margin-top:7px}
+h2{font-size:19px;margin:0 0 5px;letter-spacing:-.01em;font-weight:640}
+.note{color:var(--text-secondary);font-size:13.5px;margin:0 0 18px;max-width:82ch}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12.5px;color:var(--text-secondary);margin-bottom:10px}
+.legend i{width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:6px;vertical-align:-1px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+svg{display:block;width:100%;overflow:visible}
+.gl{stroke:var(--grid);stroke-width:1}
+.ax{stroke:var(--axis);stroke-width:1}
+.tk{fill:var(--muted);font-size:11px}
+.lbl{fill:var(--text-secondary);font-size:10.5px;font-weight:600}
+.qd{fill:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;font-weight:650;opacity:.75}
+.dot{fill:var(--s1);fill-opacity:.42;stroke:var(--s1);stroke-width:1.5;cursor:pointer}
+.dot:hover{fill-opacity:.72}
+.bar{fill:var(--s1)}.bar2{fill:var(--s2)}
+.brow:hover .bar,.brow:hover .bar2{opacity:.72}
+table{width:100%;border-collapse:collapse;font-size:13px}
+#tgt{min-width:1080px}
+#tgt td.n,#tgt th.n{white-space:nowrap}
+#tgt td:nth-child(2){min-width:210px}
+th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
+  font-weight:650;padding:8px 9px;border-bottom:1px solid var(--axis);white-space:nowrap;cursor:pointer;user-select:none}
+th:hover{color:var(--text-primary)}
+th.n,td.n{text-align:right;font-variant-numeric:tabular-nums}
+td{padding:9px;border-bottom:1px solid var(--grid);vertical-align:top}
+tbody tr:hover{background:var(--wash)}
+.tick{font-weight:640}
+.mut{color:var(--text-secondary);font-size:12.2px}
+.pill{display:inline-block;font-size:10.5px;padding:2px 7px;border-radius:99px;
+  border:1px solid var(--border);color:var(--text-secondary);white-space:nowrap}
+.fitbar{position:relative;height:6px;background:var(--grid);border-radius:99px;width:58px;display:inline-block;
+  vertical-align:middle;margin-right:8px}
+.fitbar span{position:absolute;inset:0 auto 0 0;background:var(--s1);border-radius:99px}
+.filters{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
+.filters button{background:none;border:1px solid var(--border);color:var(--text-secondary);
+  border-radius:99px;padding:4px 12px;font-size:12px;cursor:pointer;font-family:inherit}
+.filters button:hover{background:var(--wash)}
+.filters button[aria-pressed=true]{background:var(--s1);border-color:var(--s1);color:#fff}
+#tip{position:fixed;pointer-events:none;opacity:0;transition:opacity .1s;background:var(--surface-1);
+  border:1px solid var(--border);border-radius:9px;padding:10px 13px;font-size:12.5px;max-width:290px;
+  box-shadow:0 6px 24px rgba(0,0,0,.14);z-index:99;line-height:1.45}
+#tip b{display:block;font-size:13.5px;margin-bottom:4px}
+#tip .r{color:var(--text-secondary);display:flex;justify-content:space-between;gap:16px}
+#tip .r b{display:inline;font-size:12.5px;color:var(--text-primary);margin:0}
+details{margin-top:8px}
+summary{cursor:pointer;color:var(--text-secondary);font-size:12.5px;padding:6px 0}
+summary:hover{color:var(--text-primary)}
+footer{color:var(--muted);font-size:12px;margin-top:34px;line-height:1.7}
+footer a{color:var(--text-secondary)}
+@media(max-width:900px){.tiles{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}
+  h1{font-size:27px}.wrap{padding:26px 15px 60px}}
+</style></head><body>
+<div class="wrap">
+<header>
+  <h1>The 2030 Patent Cliff Map</h1>
+  <p class="sub">Every large-cap pharma ranked by the revenue it loses to patent expiry between 2027 and 2032,
+  set against the balance-sheet capacity it has to replace that revenue — then matched to a scored universe of
+  acquisition targets at precedent-transaction premiums.</p>
+  <div class="meta">
+    <span>Data as of <strong>17 August 2026</strong></span><span>·</span>
+    <span>Q2-2026 balance sheets, FY2025 revenue</span><span>·</span>
+    <span>19 acquirers · 25 targets</span>
+    <button class="toggle" id="tt">Dark</button>
+  </div>
+</header>
+
+<div class="tiles">
+  <div class="tile"><div class="k">Revenue at risk 2027–32</div><div class="v">$293.2B</div>
+    <div class="d">32.3% of $908.0B revenue, net of $15.3B of partner double-counts
+    (gross of company lines: $308.5B)</div></div>
+  <div class="tile"><div class="k">BD firepower at 3.0×</div><div class="v">$520.4B</div>
+    <div class="d">Debt capacity to a 3.0× net-debt/EBITDA ceiling</div></div>
+  <div class="tile"><div class="k">Coverage ratio</div><div class="v">1.77×</div>
+    <div class="d">Firepower per dollar of revenue lost</div></div>
+  <div class="tile"><div class="k">Target universe cost</div><div class="v">$343.8B</div>
+    <div class="d">25 names at phase-adjusted precedent premiums</div></div>
+</div>
+
+<div class="card">
+  <h2>Who must buy, and who can afford to</h2>
+  <p class="note">Horizontal axis is the urgency score — 70% weight on the share of revenue exposed, 30% on how
+  soon the largest expiry lands. Vertical axis is debt capacity to a 3.0× leverage ceiling, adjusted for deals
+  already announced but not yet closed. Bubble area is absolute revenue at risk. Quadrant dividers sit at the
+  cohort medians.</p>
+  <div id="scatter"></div>
+  <details><summary>Show as table</summary><div id="acqtable"></div></details>
+</div>
+
+<div class="grid2">
+  <div class="card">
+    <h2>Exposure</h2>
+    <p class="note">Share of FY2025 revenue losing exclusivity in the window.</p>
+    <div id="bars1"></div>
+  </div>
+  <div class="card">
+    <h2>The hole vs. the wallet</h2>
+    <p class="note">Revenue at risk against capacity to replace it. Both in $B on one scale.</p>
+    <div class="legend">
+      <span><i style="background:var(--s2)"></i>Revenue at risk</span>
+      <span><i style="background:var(--s1)"></i>BD firepower</span>
+    </div>
+    <div id="bars2"></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Target screen</h2>
+  <p class="note">Fit weights how urgently the asset's natural acquirers need revenue (40%), whether the asset is
+  large enough to matter against those cliffs (40%), and whether any natural buyer can write the cheque (20%).
+  <strong>PoS</strong> is the modelled probability the lead asset reaches approval from its current phase.
+  <strong>rNPV</strong> is the risk-adjusted NPV of that one asset. <strong>Lead asset</strong> is the share of the
+  takeout price the lead asset alone explains — high means you are buying a product, low means you are buying a
+  platform or a pipeline. Sort any column.</p>
+  <div class="filters" id="filters"></div>
+  <div style="overflow-x:auto"><table id="tgt"><thead><tr>
+    <th data-k="fit" class="n">Fit</th><th data-k="name">Company</th><th data-k="ta">Area</th>
+    <th data-k="asset">Lead asset</th><th data-k="phase">Phase</th>
+    <th data-k="pos" class="n">PoS</th>
+    <th data-k="mcap" class="n">Mkt cap</th><th data-k="takeout" class="n">Takeout</th>
+    <th data-k="rnpv" class="n">rNPV</th><th data-k="cover" class="n">Lead asset</th>
+    <th data-k="capable">Can fund</th>
+  </tr></thead><tbody></tbody></table></div>
+</div>
+
+<div class="card">
+  <h2>How probability of success is estimated</h2>
+  <p class="note" style="max-width:none">
+  Phase-transition probabilities come from <strong>BIO / Informa Pharma Intelligence / QLS Advisors, "Clinical
+  Development Success Rates and Contributing Factors 2011–2020"</strong> — 12,728 transitions across 9,704 programs.
+  It is preferred to Wong, Siah &amp; Lo (2019) because it is the most recent complete phase-by-phase publication,
+  uses a four-transition structure matching how rNPV is built, and does not impute unresolved trial outcomes.
+  Wong reports CNS at 15.0% against BIO's 5.9% for neurology, a 2.5× disagreement driven almost entirely by that
+  imputation — a reviewer will raise it, so it is named here. A uniform 0.85× drift factor is applied because
+  industry-wide likelihood of approval fell from 7.9% (2011–20) to 6.7% (2014–23) per Citeline.<br><br>
+  <strong>Modifiers are not multiplied.</strong> Lead-indication status, biomarker preselection, genetic target
+  validation and rare-disease designation are each reported marginally against the all-indication baseline, and they
+  are strongly correlated with one another. Stacking them raw gives a 49× uplift and a probability above 1.0. They
+  are instead combined in log-odds space with a 0.55 damping exponent and a hard 3.5× cap on total uplift — for a
+  Phase 2 neurology asset, four modifiers move the estimate from 10.5% to 36.7%, where naive multiplication would
+  produce 390%.<br><br>
+  <strong>Clinical risk lives in the PoS term, not the discount rate.</strong> The discount rate is a WACC-style 10%
+  (Baras et al., <em>Nat Rev Drug Discov</em> 2012, median 10%; DiMasi 2016, 10.5% real; Alacrita 10–13%). Applying
+  a venture-style 20–40% rate <em>and</em> probability weights double-counts the same risk, and is the most common
+  error in published biotech valuations.<br><br>
+  <strong>What the rNPV is not.</strong> It values one asset, on a lead-indication basis, over a single exclusivity
+  window, at area-median commercial assumptions from Tendler et al. (<em>Ther Innov Regul Sci</em> 2026, n=391
+  launches). It is not a price target and it does not value platforms, second indications, or pipelines. That is
+  precisely why the "lead asset" column is expressed as coverage of the takeout price rather than as a
+  buy/sell signal. <strong>Peak-sales figures are my own estimates</strong> — scaled off reported revenue for
+  commercial names, area medians otherwise. A real desk would take them from FactSet or Evaluate consensus. They
+  are the weakest input in the model and the first thing to replace.<br><br>
+  <strong>An empirical model is shipped but not yet run.</strong> <code>pos_train.py</code> reconstructs development
+  paths from AACT or ClinicalTrials.gov, labels each trial by whether its program advanced, and fits a calibrated
+  gradient-boosted classifier with cross-validation grouped by sponsor. Its output blends with these priors rather
+  than replacing them, because the registry label is biased upward by right-censoring, unregistered follow-on
+  trials, and silent discontinuation. The ranking it produces across therapeutic areas is trustworthy; the absolute
+  levels are not.</p>
+</div>
+
+<div class="card">
+  <h2>Method and known weaknesses</h2>
+  <p class="note" style="max-width:none">
+  <strong>Firepower</strong> = max(0, 3.0 × LTM EBITDA − pro-forma net debt). Three point zero is the leverage an
+  A−/BBB+ issuer can defend without a downgrade; it is a modelling convention, not a company target. Pro-forma
+  adjusts for AbbVie/Apogee ($10.9B), GSK/Nuvalent ($10.6B) and Vertex/Crinetics ($8.8B) — announced, not closed,
+  and therefore absent from the 30 June balance sheets.<br><br>
+  <strong>EBITDA is stated before acquired IPR&amp;D and non-recurring items</strong>, which is the basis a rating
+  agency uses for a leverage test. On strict GAAP the 2026 numbers are unusable for this purpose: Merck expensed
+  $14.7B of acquired IPR&amp;D in H1-2026 (Cidara, Terns) and Gilead $11.3B (Arcellx, Tubulis, Ouro), which pushes
+  Merck's GAAP LTM EBITDA to roughly $12B and Gilead's to roughly zero. Both are real cash outflows already
+  reflected in net debt; expensing them again through EBITDA would double-count them.<br><br>
+  <strong>Aggregate revenue at risk is de-duplicated.</strong> Three franchises are booked by two companies each —
+  Pfizer's Eliquis alliance revenue derives from BMS's gross sales, Merck's Lynparza from AstraZeneca's, and
+  Regeneron's collaboration revenue from Sanofi's Dupixent. That is $15.3B counted twice. The per-company lines are
+  correct as shown; only the portfolio total is adjusted.<br><br>
+  <strong>Three things this model gets wrong on purpose.</strong> First, it treats debt capacity as spendable,
+  when several boards have said otherwise — Pfizer publicly guides to roughly $6B of remaining BD capacity against
+  the $24B this model computes, and Gilead has said it is done for the year. Second, erosion is not modelled: a
+  small-molecule cliff loses 55–70% in year one, a self-administered biologic around 40% (Stelara's actual year-one
+  result), and a vaccine essentially nothing, so raw at-risk revenue overstates the economic hole for Merck's
+  Gardasil and GSK's Shingrix. Third, premiums are medians applied mechanically; the real distribution is wide and
+  leak-distorted, and several 2026 deals printed single-digit premiums to the prior close against 30–86% to VWAP.<br><br>
+  <strong>Where the data is thin.</strong> Roche and Novartis publish no product-level patent table, so roughly $43B
+  of at-risk revenue rests on estimated dates — Roche discloses nothing for Ocrevus, Hemlibra, Tecentriq, Kadcyla or
+  Alecensa, and Novartis's only company statement is that Cosentyx expires "around the end of the decade." Both are
+  flagged low confidence and should be read as unknown rather than estimated. Takeda does not disclose product-level revenue in its release.
+  Boehringer Ingelheim is excluded entirely — it has the highest concentration in the industry (Jardiance plus Ofev,
+  ~45% of group sales) but is private, so there is no balance sheet to model. Confidence is flagged per company in
+  the table above.</p>
+</div>
+
+<footer>
+  Built from company 10-K and 20-F patent tables, Q2-2026 earnings releases and balance sheets, FDA Orange Book
+  exclusivity data, and 70 precedent transactions announced January 2024 – August 2026.
+  Full line-level sourcing in the accompanying memo. Independent work, not investment advice.
+</footer>
+</div>
+
+<div id="tip"></div>
+<script>
+const DATA = {"asof":"2026-08-17","params":{"target_leverage":3.0,"window":[2027,2032],"premiums":{"Ph1":1.05,"Ph2":0.54,"Ph3":0.435,"Commercial":0.365},"u_med":44.5,"f_med":24.7},"acquirers":[{"name":"Bristol Myers","ticker":"BMY","rev":48.2,"at_risk":27.1,"pct_at_risk":56.2,"net_debt":32.05,"pf_net_debt":32.05,"ebitda":18.93,"lev":1.69,"pf_lev":1.69,"firepower":24.7,"peak_yr":2028,"urgency":76.5,"conf":"high","note":"Eliquis $14.4B (Apr-2028 settlement) + Opdivo $10.0B (2028). Cleanest dataset in the set \u2014 all dates from the 10-K exclusivity table.","coverage":0.91,"quadrant":"Must buy, can buy"},{"name":"Novo Nordisk","ticker":"NVO","rev":46.8,"at_risk":34.6,"pct_at_risk":73.9,"net_debt":14.5,"pf_net_debt":14.5,"ebitda":21.6,"lev":0.67,"pf_lev":0.67,"firepower":50.3,"peak_yr":2031,"urgency":75.0,"conf":"high","note":"Semaglutide 73.9% of revenue. US ~Dec-2031; EU SPCs stagger UK 2027 / Italy 2028 / Germany 2029; Canada, China, India, Brazil already off-patent.","coverage":1.45,"quadrant":"Must buy, can buy"},{"name":"Merck & Co","ticker":"MRK","rev":65.0,"at_risk":34.1,"pct_at_risk":52.5,"net_debt":46.77,"pf_net_debt":46.77,"ebitda":28.87,"lev":1.62,"pf_lev":1.62,"firepower":39.8,"peak_yr":2028,"urgency":73.0,"conf":"high","note":"Keytruda $31.6B / 48.7% of revenue, US LOE 2028. Vaccines (Gardasil, Vaxneuvance) EXCLUDED \u2014 no 351(k) biosimilar pathway has ever been used.","coverage":1.17,"quadrant":"Must buy, can buy"},{"name":"Amgen","ticker":"AMGN","rev":36.8,"at_risk":13.9,"pct_at_risk":37.8,"net_debt":43.32,"pf_net_debt":43.32,"ebitda":17.27,"lev":2.51,"pf_lev":2.51,"firepower":8.5,"peak_yr":2028,"urgency":59.3,"conf":"high","note":"Seven LOEs 2027-30 (Otezla, Enbrel, Repatha, Kyprolis, Nplate, Tepezza, Blincyto), all with exact dates in the 10-K. 2.5x levered, negative outlook.","coverage":0.61,"quadrant":"Must buy, can't buy"},{"name":"GSK","ticker":"GSK","rev":43.4,"at_risk":15.9,"pct_at_risk":36.6,"net_debt":20.01,"pf_net_debt":30.61,"ebitda":13.4,"lev":1.49,"pf_lev":2.28,"firepower":9.6,"peak_yr":2028,"urgency":58.2,"conf":"med","note":"Shingrix REMOVED \u2014 US patents run 2035-39, outside the window. Dolutegravir GBP 5,648M from Apr-2028 is the real event. Nuvalent $10.6B pending.","coverage":0.6,"quadrant":"Must buy, can't buy"},{"name":"Pfizer","ticker":"PFE","rev":62.6,"at_risk":20.8,"pct_at_risk":33.2,"net_debt":51.5,"pf_net_debt":51.5,"ebitda":25.38,"lev":2.03,"pf_lev":2.03,"firepower":24.6,"peak_yr":2028,"urgency":55.0,"conf":"high","note":"Eliquis alliance $8.0B + Ibrance $4.1B (2027) + Xtandi (2027). Vyndaqel now settled to 1 Jun 2031 \u2014 a 2031 event, not 2026-28.","coverage":1.18,"quadrant":"Must buy, can't buy"},{"name":"Novartis","ticker":"NVS","rev":54.5,"at_risk":20.2,"pct_at_risk":37.1,"net_debt":39.4,"pf_net_debt":39.4,"ebitda":22.4,"lev":1.76,"pf_lev":1.76,"firepower":27.8,"peak_yr":2029,"urgency":52.6,"conf":"low","note":"Revenues exact. Novartis publishes NO patent expiry table; only company statement is Cosentyx 'around the end of the decade'. Other four dates unknown.","coverage":1.38,"quadrant":"Must buy, can buy"},{"name":"Roche","ticker":"RHHBY","rev":75.1,"at_risk":23.1,"pct_at_risk":30.8,"net_debt":27.26,"pf_net_debt":27.26,"ebitda":30.4,"lev":0.9,"pf_lev":0.9,"firepower":63.9,"peak_yr":2029,"urgency":46.7,"conf":"low","note":"Perjeta REMOVED \u2014 Roche states its primary patents expired Q2-2025. Roche discloses no expiry date for Ocrevus, Hemlibra, Tecentriq, Kadcyla or Alecensa. Dates are estimates.","coverage":2.77,"quadrant":"Must buy, can buy"},{"name":"AstraZeneca","ticker":"AZN","rev":58.7,"at_risk":20.7,"pct_at_risk":35.3,"net_debt":26.91,"pf_net_debt":26.91,"ebitda":20.25,"lev":1.33,"pf_lev":1.33,"firepower":33.8,"peak_yr":2030,"urgency":44.9,"conf":"high","note":"Imfinzi 2031, Tagrisso 2032, Lynparza 2027. Best-disclosed patent table in the sector. Farxiga $8.4B sits at 2026, just outside.","coverage":1.63,"quadrant":"Must buy, can buy"},{"name":"Regeneron","ticker":"REGN","rev":14.3,"at_risk":5.9,"pct_at_risk":41.3,"net_debt":-15.12,"pf_net_debt":-15.12,"ebitda":4.7,"lev":-3.22,"pf_lev":-3.22,"firepower":29.2,"peak_yr":2031,"urgency":44.5,"conf":"high","note":"Total Sanofi collaboration revenue $5.9B (Dupixent + Kevzara), 2031. Eylea cliff already in the run-rate. Net cash $15.1B incl. long-term securities.","coverage":4.95,"quadrant":"Must buy, can buy"},{"name":"Eli Lilly","ticker":"LLY","rev":65.2,"at_risk":18.0,"pct_at_risk":27.6,"net_debt":45.96,"pf_net_debt":45.96,"ebitda":36.4,"lev":1.26,"pf_lev":1.26,"firepower":63.2,"peak_yr":2029,"urgency":43.8,"conf":"high","note":"All five dates confirmed in the 10-K IP table: Trulicity 2027, Jardiance 2029, Taltz 2030, Verzenio 2031, Olumiant 2032. Denominator growing fast.","coverage":3.51,"quadrant":"Can buy, needn't"},{"name":"Johnson & Johnson","ticker":"JNJ","rev":94.2,"at_risk":25.9,"pct_at_risk":27.5,"net_debt":28.28,"pf_net_debt":28.28,"ebitda":33.2,"lev":0.85,"pf_lev":0.85,"firepower":71.3,"peak_yr":2029,"urgency":43.7,"conf":"med","note":"Darzalex $14.4B (2029) + Tremfya (2031). Revenues exact; LOE dates from J&J's portfolio disclosure, not a filings table.","coverage":2.75,"quadrant":"Can buy, needn't"},{"name":"Sanofi","ticker":"SNY","rev":49.3,"at_risk":19.8,"pct_at_risk":40.2,"net_debt":17.68,"pf_net_debt":17.68,"ebitda":15.47,"lev":1.14,"pf_lev":1.14,"firepower":28.7,"peak_yr":2031,"urgency":43.5,"conf":"high","note":"Dupixent EUR 15,714M = 36.0% of net sales, plus Fabrazyme and Nexviazyme. CoM Oct-2027, PTE to Mar-2031, formulation claims asserted to 2045.","coverage":1.45,"quadrant":"Can buy, needn't"},{"name":"Gilead","ticker":"GILD","rev":29.4,"at_risk":9.7,"pct_at_risk":33.0,"net_debt":23.07,"pf_net_debt":23.07,"ebitda":14.6,"lev":1.58,"pf_lev":1.58,"firepower":20.7,"peak_yr":2030,"urgency":42.8,"conf":"high","note":"Biktarvy resettled 2033 -> 1 Apr 2036. EBITDA is pre-IPR&D: GAAP H1-26 shows an operating loss after $11.3B of acquired IPR&D.","coverage":2.14,"quadrant":"Sidelined"},{"name":"Biogen","ticker":"BIIB","rev":9.9,"at_risk":1.5,"pct_at_risk":15.2,"net_debt":6.81,"pf_net_debt":6.81,"ebitda":3.36,"lev":2.03,"pf_lev":2.03,"firepower":3.3,"peak_yr":2030,"urgency":26.1,"conf":"med","note":"Total revenue, not product revenue. Cliff already happened (Tecfidera 2020, Tysabri 2023-25). A further $1.4B Ocrevus royalty is exposed but undateable.","coverage":2.18,"quadrant":"Sidelined"},{"name":"Bayer","ticker":"BAYRY","rev":51.4,"at_risk":0.8,"pct_at_risk":1.6,"net_debt":38.34,"pf_net_debt":38.34,"ebitda":11.58,"lev":3.31,"pf_lev":3.31,"firepower":0.0,"peak_yr":2028,"urgency":25.5,"conf":"high","note":"CORRECTED: Xarelto and Eylea LOEs have ALREADY happened per Bayer's own AR2025. Only Adempas remains in-window. Bayer is not a patent-cliff story.","coverage":0.0,"quadrant":"Sidelined"},{"name":"Takeda","ticker":"TAK","rev":30.0,"at_risk":5.7,"pct_at_risk":19.0,"net_debt":27.57,"pf_net_debt":27.57,"ebitda":9.5,"lev":2.9,"pf_lev":2.9,"firepower":0.9,"peak_yr":2032,"urgency":17.7,"conf":"med","note":"Entyvio date now VERIFIED at 2032 from the 20-F; Alvotech biosimilar blocked to May-2032. Revenue estimate unverified. FY ends 31 March.","coverage":0.16,"quadrant":"Sidelined"},{"name":"AbbVie","ticker":"ABBV","rev":61.2,"at_risk":10.2,"pct_at_risk":16.7,"net_debt":64.25,"pf_net_debt":75.15,"ebitda":24.74,"lev":2.6,"pf_lev":3.04,"firepower":0.0,"peak_yr":2032,"urgency":15.6,"conf":"high","note":"Lowest in-window exposure. Rinvoq settled to Apr-2037, Skyrizi $17.6B hits 2033 \u2014 just outside. EBITDA corrected down 24% from the aggregator figure.","coverage":0.0,"quadrant":"Sidelined"},{"name":"Vertex","ticker":"VRTX","rev":12.0,"at_risk":0.6,"pct_at_risk":5.0,"net_debt":-13.64,"pf_net_debt":-4.84,"ebitda":5.1,"lev":-2.67,"pf_lev":-0.95,"firepower":20.1,"peak_yr":2032,"urgency":4.7,"conf":"high","note":"Trikafta protected to 2037. Least exposed name in the cohort. Zero borrowings \u2014 net cash falls to ~$2.8B pro forma for Crinetics.","coverage":33.57,"quadrant":"Sidelined"}],"targets":[{"pos":60.3,"pos_ta":"Solid tumor","pos_phase":"Ph3","mods":["lead_indication","biomarker_select","mab"],"peak":6000,"rnpv":5.15,"cover":35.5,"pos_capped":false,"ticker":"SMMT","name":"Summit Therapeutics","mcap":10.65,"cash":0.69,"ev":9.96,"ta":"Oncology","asset":"Ivonescimab","mech":"PD-1 x VEGF bispecific","phase":"Ph3","premium":36.4,"takeout":14.52,"fits":["MRK","BMY"],"capable":["MRK","BMY"],"demand":74.8,"materiality":100.0,"fundability":100.0,"fit":89.9,"thesis":"The literal Keytruda-successor modality. Carries a going-concern warning at a $10.7B cap."},{"pos":61.2,"pos_ta":"Vaccines","pos_phase":"Ph3","mods":["lead_indication"],"peak":3000,"rnpv":2.43,"cover":20.4,"pos_capped":false,"ticker":"PCVX","name":"Vaxcyte","mcap":8.64,"cash":2.51,"ev":6.13,"ta":"Vaccines","asset":"VAX-31","mech":"31-valent pneumococcal","phase":"Ph3","premium":38.4,"takeout":11.95,"fits":["MRK","PFE","GSK"],"capable":["MRK","PFE"],"demand":62.1,"materiality":100.0,"fundability":100.0,"fit":84.8,"thesis":"Gardasil and Prevnar-13 both roll off. OPUS-1 topline Q4-2026 is the catalyst."},{"pos":100.0,"pos_ta":"Cardiovascular","pos_phase":"Commercial","mods":[],"peak":3500,"rnpv":5.33,"cover":26.8,"pos_capped":false,"ticker":"BBIO","name":"BridgeBio","mcap":15.61,"cash":0.72,"ev":14.89,"ta":"Cardio/Rare","asset":"Attruby","mech":"TTR stabiliser","phase":"Commercial","premium":27.5,"takeout":19.9,"fits":["PFE","BMY","AZN"],"capable":["PFE","BMY","AZN"],"demand":58.8,"materiality":100.0,"fundability":100.0,"fit":83.5,"thesis":"Direct Vyndaqel replacement for Pfizer. EV exceeds mcap \u2014 royalty stack on top."},{"pos":100.0,"pos_ta":"Metabolic","pos_phase":"Commercial","mods":[],"peak":1000,"rnpv":1.9,"cover":17.9,"pos_capped":false,"ticker":"RYTM","name":"Rhythm Pharmaceuticals","mcap":7.95,"cash":0.33,"ev":7.62,"ta":"Metabolic","asset":"Imcivree","mech":"MC4R agonist","phase":"Commercial","premium":32.8,"takeout":10.56,"fits":["NVO","LLY","PFE"],"capable":["NVO","LLY","PFE"],"demand":57.9,"materiality":100.0,"fundability":100.0,"fit":83.2,"thesis":"Rare obesity beachhead for anyone who missed the GLP-1 wave."},{"pos":100.0,"pos_ta":"Cardiovascular","pos_phase":"Commercial","mods":[],"peak":3000,"rnpv":4.57,"cover":33.9,"pos_capped":false,"ticker":"CYTK","name":"Cytokinetics","mcap":10.31,"cash":1.7,"ev":8.61,"ta":"Cardio","asset":"Myqorzo","mech":"Cardiac myosin inhibitor","phase":"Commercial","premium":30.8,"takeout":13.48,"fits":["BMY","NVS","JNJ"],"capable":["BMY","NVS","JNJ"],"demand":57.6,"materiality":100.0,"fundability":100.0,"fit":83.0,"thesis":"Camzyos competitor. BMS could buy the thing eating its own HCM franchise."},{"pos":100.0,"pos_ta":"Metabolic","pos_phase":"Commercial","mods":[],"peak":1500,"rnpv":2.84,"cover":17.6,"pos_capped":false,"ticker":"ARWR","name":"Arrowhead","mcap":12.53,"cash":1.6,"ev":10.93,"ta":"Cardiometabolic","asset":"Redemplo","mech":"RNAi vs. apoC-III","phase":"Commercial","premium":29.2,"takeout":16.19,"fits":["NVO","LLY","NVS","AZN"],"capable":["NVO","LLY","NVS","AZN"],"demand":54.1,"materiality":100.0,"fundability":100.0,"fit":81.6,"thesis":"Cardiometabolic RNAi platform; commercial in US and Germany."},{"pos":100.0,"pos_ta":"Metabolic","pos_phase":"Commercial","mods":[],"peak":4000,"rnpv":7.58,"cover":49.8,"pos_capped":false,"ticker":"MDGL","name":"Madrigal","mcap":11.73,"cash":0.84,"ev":10.89,"ta":"Liver/Metabolic","asset":"Rezdiffra","mech":"THR-beta agonist","phase":"Commercial","premium":29.8,"takeout":15.22,"fits":["NVO","AZN","RHHBY","LLY"],"capable":["NVO","AZN","RHHBY","LLY"],"demand":52.6,"materiality":100.0,"fundability":100.0,"fit":81.0,"thesis":"Only approved MASH drug, >50k patients. Roche and Novo both bought MASH Ph3 assets."},{"pos":67.9,"pos_ta":"Immunology","pos_phase":"Ph3","mods":["lead_indication","mab"],"peak":2500,"rnpv":2.25,"cover":18.8,"pos_capped":false,"ticker":"IMVT","name":"Immunovant","mcap":8.64,"cash":0.8,"ev":7.84,"ta":"Immunology","asset":"IMVT-1402","mech":"Anti-FcRn mAb","phase":"Ph3","premium":38.4,"takeout":11.95,"fits":["JNJ","NVS","SNY"],"capable":["JNJ","NVS","SNY"],"demand":46.6,"materiality":100.0,"fundability":100.0,"fit":78.6,"thesis":"Multi-indication FcRn. Roivant-controlled, which complicates but does not block."},{"pos":100.0,"pos_ta":"Cardiovascular","pos_phase":"Commercial","mods":[],"peak":3000,"rnpv":4.57,"cover":36.0,"pos_capped":false,"ticker":"IONS","name":"Ionis","mcap":9.66,"cash":2.1,"ev":7.56,"ta":"Rare/Cardio","asset":"Tryngolza","mech":"ASO vs. apoC-III","phase":"Commercial","premium":31.3,"takeout":12.68,"fits":["NVS","BIIB","AZN","RHHBY"],"capable":["NVS","AZN","RHHBY"],"demand":42.6,"materiality":100.0,"fundability":100.0,"fit":77.0,"thesis":"ASO platform with three commercial assets. Long-standing Biogen partner."},{"pos":81.6,"pos_ta":"Neurology","pos_phase":"Filed","mods":["lead_indication","rare_disease","mab"],"peak":1200,"rnpv":1.69,"cover":18.7,"pos_capped":false,"ticker":"SRRK","name":"Scholar Rock","mcap":6.4,"cash":0.49,"ev":5.91,"ta":"Neuromuscular","asset":"Apitegromab","mech":"Anti-myostatin","phase":"Ph3","premium":41.2,"takeout":9.04,"fits":["BIIB","NVS","RHHBY"],"capable":["NVS","RHHBY"],"demand":41.8,"materiality":100.0,"fundability":100.0,"fit":76.7,"thesis":"FDA decision due by 30 Sep 2026 \u2014 the nearest hard catalyst in the universe."},{"pos":100.0,"pos_ta":"Rare disease","pos_phase":"Commercial","mods":[],"peak":3000,"rnpv":5.69,"cover":71.7,"pos_capped":false,"ticker":"TVTX","name":"Travere","mcap":5.86,"cash":0.49,"ev":5.37,"ta":"Rare/Renal","asset":"Filspari","mech":"Dual ETA/AT1","phase":"Commercial","premium":35.2,"takeout":7.93,"fits":["NVS","AZN","RHHBY"],"capable":["NVS","AZN","RHHBY"],"demand":48.1,"materiality":92.9,"fundability":100.0,"fit":76.4,"thesis":"IgAN franchise; company has signalled >$3B peak. Novartis is building renal."},{"pos":100.0,"pos_ta":"Psychiatry","pos_phase":"Commercial","mods":[],"peak":2500,"rnpv":4.1,"cover":28.1,"pos_capped":false,"ticker":"AXSM","name":"Axsome","mcap":11.19,"cash":0.32,"ev":10.87,"ta":"CNS","asset":"Auvelity","mech":"NMDA / sigma-1","phase":"Commercial","premium":30.1,"takeout":14.56,"fits":["BMY","JNJ","ABBV","BIIB"],"capable":["BMY","JNJ"],"demand":40.5,"materiality":100.0,"fundability":100.0,"fit":76.2,"thesis":"CNS commercial platform. J&J paid $14.6B for Intra-Cellular on the same logic."},{"pos":41.6,"pos_ta":"Immunology","pos_phase":"Ph2","mods":["lead_indication","genetic_evidence"],"peak":3000,"rnpv":1.36,"cover":9.3,"pos_capped":false,"ticker":"KYMR","name":"Kymera","mcap":10.07,"cash":1.5,"ev":8.57,"ta":"Immunology","asset":"KT-621","mech":"Oral STAT6 degrader","phase":"Ph2","premium":45.8,"takeout":14.68,"fits":["SNY","REGN","ABBV","PFE"],"capable":["SNY","REGN","PFE"],"demand":39.6,"materiality":100.0,"fundability":100.0,"fit":75.9,"thesis":"An oral Dupixent. The single most obvious defensive buy for Sanofi/Regeneron."},{"pos":100.0,"pos_ta":"Rare disease","pos_phase":"Commercial","mods":[],"peak":800,"rnpv":1.52,"cover":28.4,"pos_capped":false,"ticker":"DNLI","name":"Denali","mcap":3.91,"cash":0.94,"ev":2.97,"ta":"CNS/Rare","asset":"Avlayah","mech":"BBB-crossing ERT","phase":"Commercial","premium":36.5,"takeout":5.34,"fits":["BIIB","TAK","SNY","BMY"],"capable":["SNY","BMY"],"demand":41.0,"materiality":98.7,"fundability":100.0,"fit":75.8,"thesis":"BMS said out loud it wants blood-brain-barrier-penetrant neuro. This is the platform."},{"pos":100.0,"pos_ta":"Respiratory","pos_phase":"Commercial","mods":[],"peak":5000,"rnpv":10.18,"cover":30.0,"pos_capped":false,"ticker":"INSM","name":"Insmed","mcap":27.61,"cash":1.16,"ev":26.45,"ta":"Respiratory","asset":"Brinsupri","mech":"Oral DPP1 inhibitor","phase":"Commercial","premium":23.0,"takeout":33.96,"fits":["MRK","GSK","AZN"],"capable":["MRK"],"demand":58.7,"materiality":100.0,"fundability":50.0,"fit":73.5,"thesis":"Merck bought Verona for COPD at 34x. Insmed is the next respiratory asset of scale."},{"pos":100.0,"pos_ta":"Solid tumor","pos_phase":"Commercial","mods":[],"peak":1500,"rnpv":2.84,"cover":46.3,"pos_capped":false,"ticker":"CELC","name":"Celcuity","mcap":4.5,"cash":0.75,"ev":3.75,"ta":"Oncology","asset":"Revtorpyk","mech":"Pan-PI3K/mTOR","phase":"Commercial","premium":36.5,"takeout":6.14,"fits":["PFE","NVS","AZN"],"capable":["PFE","NVS","AZN"],"demand":50.8,"materiality":74.7,"fundability":100.0,"fit":70.2,"thesis":"Approved Jul-2026, launching Q3. Direct Ibrance-adjacent breast-cancer asset."},{"pos":100.0,"pos_ta":"Cardiovascular","pos_phase":"Commercial","mods":[],"peak":7000,"rnpv":10.65,"cover":28.8,"pos_capped":false,"ticker":"ALNY","name":"Alnylam","mcap":30.23,"cash":3.31,"ev":26.92,"ta":"Rare/Cardio","asset":"Amvuttra","mech":"RNAi vs. TTR","phase":"Commercial","premium":22.3,"takeout":36.97,"fits":["NVS","RHHBY","PFE","REGN"],"capable":["RHHBY"],"demand":49.7,"materiality":100.0,"fundability":50.0,"fit":69.9,"thesis":"Platform + commercial ATTR. Down 47% y/y on a guidance cut \u2014 cheapest it has been."},{"pos":60.4,"pos_ta":"Metabolic","pos_phase":"Ph3","mods":["lead_indication"],"peak":3800,"rnpv":3.27,"cover":58.8,"pos_capped":false,"ticker":"GPCR","name":"Structure Therapeutics","mcap":3.87,"cash":1.34,"ev":2.53,"ta":"Obesity","asset":"Aleniglipron","mech":"Oral GLP-1RA","phase":"Ph3","premium":43.5,"takeout":5.55,"fits":["PFE","AZN","NVS","MRK"],"capable":["PFE","AZN","NVS","MRK"],"demand":56.4,"materiality":58.0,"fundability":100.0,"fit":65.7,"thesis":"Oral small-molecule GLP-1. Analyst peak-sales estimate $3.8B."},{"pos":63.7,"pos_ta":"Solid tumor","pos_phase":"Ph3","mods":["lead_indication","genetic_evidence","biomarker_select"],"peak":4000,"rnpv":3.63,"cover":6.5,"pos_capped":false,"ticker":"RVMD","name":"Revolution Medicines","mcap":45.28,"cash":3.94,"ev":41.34,"ta":"Oncology","asset":"Daraxonrasib","mech":"RAS(ON) inhibitor","phase":"Ph3","premium":22.8,"takeout":55.58,"fits":["MRK","BMY","PFE","AZN"],"capable":[],"demand":62.4,"materiality":100.0,"fundability":0.0,"fit":64.9,"thesis":"The only scaled RAS franchise. Merck talks collapsed on price in 2026."},{"pos":60.4,"pos_ta":"Metabolic","pos_phase":"Ph3","mods":["lead_indication"],"peak":3000,"rnpv":2.58,"cover":46.5,"pos_capped":false,"ticker":"VKTX","name":"Viking Therapeutics","mcap":3.87,"cash":0.5,"ev":3.37,"ta":"Obesity","asset":"VK2735","mech":"Dual GLP-1/GIP","phase":"Ph3","premium":43.5,"takeout":5.55,"fits":["PFE","AZN","RHHBY","MRK"],"capable":["PFE","AZN","RHHBY","MRK"],"demand":54.9,"materiality":56.3,"fundability":100.0,"fit":64.5,"thesis":"Ph3 fully enrolled. Pfizer paid >$10B for Metsera at Ph2b."},{"pos":78.5,"pos_ta":"Neurology","pos_phase":"Filed","mods":["lead_indication"],"peak":1200,"rnpv":1.62,"cover":11.0,"pos_capped":false,"ticker":"PRAX","name":"Praxis Precision","mcap":10.85,"cash":1.4,"ev":9.45,"ta":"CNS","asset":"Ulixacaltamide","mech":"T-type Ca blocker","phase":"Ph3","premium":36.2,"takeout":14.78,"fits":["ABBV","JNJ","BIIB","TAK"],"capable":["JNJ"],"demand":25.8,"materiality":100.0,"fundability":50.0,"fit":60.3,"thesis":"Essential tremor Ph3 + Breakthrough-designated SCN2A ASO. Up 892% y/y."},{"pos":100.0,"pos_ta":"Solid tumor","pos_phase":"Commercial","mods":[],"peak":800,"rnpv":1.52,"cover":49.4,"pos_capped":false,"ticker":"NUVB","name":"Nuvation Bio","mcap":2.25,"cash":0.66,"ev":1.59,"ta":"Oncology","asset":"Ibtrozi","mech":"ROS1 TKI","phase":"Commercial","premium":36.5,"takeout":3.07,"fits":["PFE","AZN","NVS"],"capable":["PFE","AZN","NVS"],"demand":50.8,"materiality":37.3,"fundability":100.0,"fit":55.3,"thesis":"Commercial precision-oncology bolt-on at a sub-$2.5B cap."},{"pos":11.1,"pos_ta":"Solid tumor","pos_phase":"Ph1","mods":["lead_indication"],"peak":1000,"rnpv":0.11,"cover":5.3,"pos_capped":false,"ticker":"JANX","name":"Janux","mcap":0.99,"cash":0.97,"ev":0.02,"ta":"Oncology","asset":"JANX007","mech":"Masked PSMA TCE","phase":"Ph1","premium":105.0,"takeout":2.03,"fits":["MRK","BMY","JNJ"],"capable":["MRK","BMY","JNJ"],"demand":64.4,"materiality":17.5,"fundability":100.0,"fit":52.8,"thesis":"$24.6M enterprise value \u2014 the market ascribes essentially zero to the pipeline."},{"pos":100.0,"pos_ta":"Heme-oncology","pos_phase":"Commercial","mods":[],"peak":700,"rnpv":1.33,"cover":100.2,"pos_capped":false,"ticker":"KURA","name":"Kura Oncology","mcap":0.97,"cash":0.52,"ev":0.45,"ta":"Oncology","asset":"Komzifti","mech":"Menin inhibitor","phase":"Commercial","premium":36.5,"takeout":1.32,"fits":["MRK","PFE","ABBV"],"capable":["MRK","PFE"],"demand":47.9,"materiality":15.3,"fundability":100.0,"fit":45.2,"thesis":"Approved drug, $293M enterprise value. Trades at a fraction of cash-adjusted worth."},{"pos":23.1,"pos_ta":"Psychiatry","pos_phase":"Ph2","mods":["lead_indication"],"peak":1500,"rnpv":0.35,"cover":42.5,"pos_capped":false,"ticker":"MPLT","name":"MapLight","mcap":0.54,"cash":0.35,"ev":0.19,"ta":"CNS","asset":"ML-007C-MA","mech":"M1/M4 muscarinic","phase":"Ph2","premium":54.0,"takeout":0.83,"fits":["BMY","JNJ","ABBV"],"capable":["BMY","JNJ"],"demand":45.3,"materiality":9.9,"fundability":100.0,"fit":42.1,"thesis":"Muscarinic schizophrenia \u2014 the Cobenfy modality. Down ~72% after a mixed Ph2."}],"totals":{"rev":908.0,"at_risk":308.5,"firepower":520.4,"takeout_universe":343.8,"double_count":15.3,"n_targets":25,"at_risk_dedup":293.2,"pct_at_risk":34.0,"pct_at_risk_dedup":32.3}};
+const A = DATA.acquirers, T = DATA.targets, P = DATA.params;
+const tip = document.getElementById('tip');
+const fmt = (n,d=1)=>n.toFixed(d);
+function show(e,html){tip.innerHTML=html;tip.style.opacity=1;move(e);}
+function move(e){const r=tip.getBoundingClientRect();
+  let x=e.clientX+14,y=e.clientY+14;
+  if(x+r.width>innerWidth-10)x=e.clientX-r.width-14;
+  if(y+r.height>innerHeight-10)y=e.clientY-r.height-14;
+  tip.style.left=x+'px';tip.style.top=y+'px';}
+function hide(){tip.style.opacity=0;}
+const row=(k,v)=>`<div class="r"><span>${k}</span><b>${v}</b></div>`;
+const SVG='http://www.w3.org/2000/svg';
+function el(t,a){const n=document.createElementNS(SVG,t);for(const k in a)n.setAttribute(k,a[k]);return n;}
+
+/* ---------- quadrant scatter ---------- */
+(function(){
+  const W=1080,H=650,m={t:26,r:30,b:52,l:64};
+  const pw=W-m.l-m.r, ph=H-m.t-m.b;
+  const xMax=90, yMax=90;
+  const X=v=>m.l+v/xMax*pw, Y=v=>m.t+ph-v/yMax*ph;
+  const rMax=Math.max(...A.map(a=>a.at_risk));
+  const R=v=>7+Math.sqrt(v/rMax)*30;
+  const s=el('svg',{viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':'Urgency versus firepower'});
+
+  for(let g=0;g<=yMax;g+=15){s.appendChild(el('line',{x1:m.l,x2:m.l+pw,y1:Y(g),y2:Y(g),class:'gl'}));
+    const t=el('text',{x:m.l-11,y:Y(g)+4,class:'tk','text-anchor':'end'});t.textContent='$'+g+'B';s.appendChild(t);}
+  for(let g=0;g<=xMax;g+=15){const t=el('text',{x:X(g),y:m.t+ph+22,class:'tk','text-anchor':'middle'});
+    t.textContent=g;s.appendChild(t);}
+  s.appendChild(el('line',{x1:m.l,x2:m.l+pw,y1:m.t+ph,y2:m.t+ph,class:'ax'}));
+  s.appendChild(el('line',{x1:m.l,x2:m.l,y1:m.t,y2:m.t+ph,class:'ax'}));
+
+  // quadrant dividers at cohort medians
+  s.appendChild(el('line',{x1:X(P.u_med),x2:X(P.u_med),y1:m.t,y2:m.t+ph,class:'ax','stroke-dasharray':'0'}));
+  s.appendChild(el('line',{x1:m.l,x2:m.l+pw,y1:Y(P.f_med),y2:Y(P.f_med),class:'ax'}));
+  const q=(x,y,txt,anc)=>{const t=el('text',{x,y,class:'qd','text-anchor':anc});t.textContent=txt;s.appendChild(t);};
+  q(m.l+pw-4,m.t+14,'MUST BUY · CAN BUY','end');
+  q(m.l+4,m.t+14,'CAN BUY · NEEDN’T','start');
+  q(m.l+pw-4,m.t+ph-8,'MUST BUY · CAN’T BUY','end');
+  q(m.l+4,m.t+ph-8,'SIDELINED','start');
+
+  const ax=el('text',{x:m.l+pw/2,y:H-8,class:'tk','text-anchor':'middle'});
+  ax.textContent='Urgency score  (exposure depth 70% · cliff proximity 30%)';s.appendChild(ax);
+  const ay=el('text',{x:-(m.t+ph/2),y:15,class:'tk','text-anchor':'middle',transform:'rotate(-90)'});
+  ay.textContent='BD firepower to 3.0× leverage';s.appendChild(ay);
+
+  // nudge labels that would collide
+  // [dx, dy] — dy -1 = above the mark, +1 = below, 0 = beside it (vertically centred)
+  const nudge={JNJ:[0,-1],LLY:[-34,0],RHHBY:[40,0],NVO:[0,-1],MRK:[-44,0],BMY:[0,1],
+               AZN:[0,-1],REGN:[-44,0],SNY:[0,1],GILD:[0,1],PFE:[26,-1],NVS:[0,1],
+               AMGN:[0,-1],GSK:[0,1],VRTX:[0,-1],ABBV:[0,1],TAK:[0,-1],BIIB:[0,-1],
+               BAYRY:[48,1]};
+  A.forEach(a=>{
+    const cx=X(a.urgency),cy=Y(a.firepower),r=R(a.at_risk);
+    const c=el('circle',{cx,cy,r,class:'dot'});
+    c.addEventListener('mousemove',e=>show(e,`<b>${a.name}</b>`+
+      row('Revenue at risk','$'+fmt(a.at_risk)+'B ('+a.pct_at_risk+'%)')+
+      row('Peak expiry',a.peak_yr)+row('Urgency',a.urgency)+
+      row('Net debt / EBITDA',a.lev+'×'+(a.pf_lev!==a.lev?' → '+a.pf_lev+'× PF':''))+
+      row('Firepower','$'+fmt(a.firepower)+'B')+row('Coverage',a.coverage+'×')+
+      `<div class="r" style="margin-top:7px;display:block">${a.note}</div>`));
+    c.addEventListener('mouseleave',hide);
+    s.appendChild(c);
+    const n=nudge[a.ticker]||[0,-1];
+    const ly = n[1]===0 ? cy+4 : (n[1]<0 ? cy-r-7 : cy+r+15);
+    const anc = n[1]===0 ? (n[0]<0?'end':'start') : 'middle';
+    const lx = n[1]===0 ? cx+(n[0]<0?-r-6:r+6) : cx+n[0];
+    const t=el('text',{x:lx,y:ly,class:'lbl','text-anchor':anc});
+    t.textContent=a.ticker;s.appendChild(t);
+  });
+  document.getElementById('scatter').appendChild(s);
+
+  let h='<table><thead><tr><th>Company</th><th class="n">Rev $B</th><th class="n">At risk $B</th>'+
+    '<th class="n">%</th><th class="n">Peak</th><th class="n">Urgency</th><th class="n">Lev</th>'+
+    '<th class="n">Firepower $B</th><th class="n">Cov</th><th>Confidence</th></tr></thead><tbody>';
+  A.forEach(a=>h+=`<tr><td class="tick">${a.name}</td><td class="n">${a.rev}</td>`+
+    `<td class="n">${a.at_risk}</td><td class="n">${a.pct_at_risk}</td><td class="n">${a.peak_yr}</td>`+
+    `<td class="n">${a.urgency}</td><td class="n">${a.pf_lev}×</td><td class="n">${a.firepower}</td>`+
+    `<td class="n">${a.coverage}×</td><td class="mut">${a.conf}</td></tr>`);
+  document.getElementById('acqtable').innerHTML=h+'</tbody></table>';
+})();
+
+/* ---------- exposure bars ---------- */
+(function(){
+  const d=[...A].sort((a,b)=>b.pct_at_risk-a.pct_at_risk);
+  const W=500,rh=23,m={t:8,r:52,b:26,l:104},H=m.t+d.length*rh+m.b;
+  const pw=W-m.l-m.r, max=80;
+  const s=el('svg',{viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':'Share of revenue at risk'});
+  for(let g=0;g<=max;g+=20){const x=m.l+g/max*pw;
+    s.appendChild(el('line',{x1:x,x2:x,y1:m.t,y2:m.t+d.length*rh,class:'gl'}));
+    const t=el('text',{x,y:H-8,class:'tk','text-anchor':'middle'});t.textContent=g+'%';s.appendChild(t);}
+  d.forEach((a,i)=>{
+    const y=m.t+i*rh, w=Math.max(2,a.pct_at_risk/max*pw), bh=rh-9;
+    const g=el('g',{class:'brow'});
+    g.appendChild(el('rect',{x:m.l,y:y+4,width:w,height:bh,rx:4,class:'bar'}));
+    const nm=el('text',{x:m.l-9,y:y+4+bh-2,class:'tk','text-anchor':'end'});nm.textContent=a.name;
+    g.appendChild(nm);
+    const v=el('text',{x:m.l+w+7,y:y+4+bh-2,class:'lbl'});v.textContent=a.pct_at_risk+'%';g.appendChild(v);
+    g.appendChild(el('rect',{x:m.l,y,width:pw,height:rh,fill:'transparent'}));
+    g.addEventListener('mousemove',e=>show(e,`<b>${a.name}</b>`+
+      row('At risk 2027–32','$'+fmt(a.at_risk)+'B')+row('Of revenue',a.pct_at_risk+'%')+
+      row('Peak expiry',a.peak_yr)));
+    g.addEventListener('mouseleave',hide);
+    s.appendChild(g);
+  });
+  document.getElementById('bars1').appendChild(s);
+})();
+
+/* ---------- hole vs wallet ---------- */
+(function(){
+  const d=[...A].sort((a,b)=>b.at_risk-a.at_risk);
+  const W=500,rh=28,m={t:8,r:46,b:26,l:104},H=m.t+d.length*rh+m.b;
+  const pw=W-m.l-m.r, max=90;
+  const s=el('svg',{viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':'Revenue at risk versus firepower'});
+  for(let g=0;g<=max;g+=30){const x=m.l+g/max*pw;
+    s.appendChild(el('line',{x1:x,x2:x,y1:m.t,y2:m.t+d.length*rh,class:'gl'}));
+    const t=el('text',{x,y:H-8,class:'tk','text-anchor':'middle'});t.textContent='$'+g+'B';s.appendChild(t);}
+  d.forEach((a,i)=>{
+    const y=m.t+i*rh, bh=9;
+    const g=el('g',{class:'brow'});
+    g.appendChild(el('rect',{x:m.l,y:y+3,width:Math.max(2,a.at_risk/max*pw),height:bh,rx:4,class:'bar2'}));
+    g.appendChild(el('rect',{x:m.l,y:y+3+bh+2,width:Math.max(2,a.firepower/max*pw),height:bh,rx:4,class:'bar'}));
+    const nm=el('text',{x:m.l-9,y:y+16,class:'tk','text-anchor':'end'});nm.textContent=a.name;g.appendChild(nm);
+    g.appendChild(el('rect',{x:m.l,y,width:pw,height:rh,fill:'transparent'}));
+    g.addEventListener('mousemove',e=>show(e,`<b>${a.name}</b>`+
+      row('Revenue at risk','$'+fmt(a.at_risk)+'B')+row('Firepower','$'+fmt(a.firepower)+'B')+
+      row('Coverage',a.coverage+'×')+
+      `<div class="r" style="margin-top:7px;display:block">${a.quadrant}</div>`));
+    g.addEventListener('mouseleave',hide);
+    s.appendChild(g);
+  });
+  document.getElementById('bars2').appendChild(s);
+})();
+
+/* ---------- target table ---------- */
+(function(){
+  const tb=document.querySelector('#tgt tbody');
+  const areas=['All',...new Set(T.map(t=>t.ta))];
+  let area='All', key='fit', dir=-1;
+  const fbox=document.getElementById('filters');
+  areas.forEach(a=>{const b=document.createElement('button');b.textContent=a;
+    b.setAttribute('aria-pressed',a===area);
+    b.onclick=()=>{area=a;[...fbox.children].forEach(c=>c.setAttribute('aria-pressed',c.textContent===a));draw();};
+    fbox.appendChild(b);});
+  document.querySelectorAll('#tgt th').forEach(th=>th.onclick=()=>{
+    const k=th.dataset.k; dir = key===k ? -dir : (typeof T[0][k]==='number'?-1:1); key=k; draw();});
+  function draw(){
+    const rows=T.filter(t=>area==='All'||t.ta===area).sort((a,b)=>{
+      const x=a[key],y=b[key];
+      return (typeof x==='number'? x-y : String(x).localeCompare(String(y)))*dir;});
+    tb.innerHTML=rows.map(t=>`<tr>
+      <td class="n"><span class="fitbar"><span style="width:${t.fit}%"></span></span>${fmt(t.fit,1)}</td>
+      <td><span class="tick">${t.name}</span> <span class="mut">${t.ticker}</span>
+          <div class="mut">${t.thesis}</div></td>
+      <td class="mut">${t.ta}</td>
+      <td><span>${t.asset}</span><div class="mut">${t.mech}</div></td>
+      <td><span class="pill">${t.phase}</span></td>
+      <td class="n">${t.pos_phase==='Commercial'?'<span class="mut">approved</span>':fmt(t.pos,0)+'%'}</td>
+      <td class="n">$${fmt(t.mcap)}B</td>
+      <td class="n"><b>$${fmt(t.takeout)}B</b> <span class="mut">+${fmt(t.premium,0)}%</span></td>
+      <td class="n">$${fmt(t.rnpv)}B</td>
+      <td class="n"><span class="fitbar" style="width:44px"><span style="width:${Math.min(t.cover,100)}%"></span></span>${fmt(t.cover,0)}%</td>
+      <td class="mut">${t.capable.length?t.capable.join(' '):'— none'}</td></tr>`).join('');
+  }
+  draw();
+})();
+
+/* ---------- theme ---------- */
+(function(){
+  const b=document.getElementById('tt');
+  const cur=()=>document.documentElement.getAttribute('data-theme')||
+    (matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');
+  const set=()=>b.textContent=cur()==='dark'?'Light':'Dark'; set();
+  b.onclick=()=>{document.documentElement.setAttribute('data-theme',cur()==='dark'?'light':'dark');set();};
+})();
+document.addEventListener('scroll',hide,{passive:true});
+</script></body></html>

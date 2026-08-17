@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+pos_model.json
+.venv/

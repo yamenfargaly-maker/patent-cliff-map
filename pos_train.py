@@ -1,0 +1,330 @@
+"""
+POS_TRAIN.PY — train an empirical probability-of-success model on clinical trial data.
+
+WHAT IT DOES
+    Reconstructs drug development paths from trial registry data, labels each
+    trial with whether its program advanced to the next phase, fits a gradient
+    boosted classifier, calibrates the output probabilities, and writes
+    `pos_model.json` for pos.py to blend with the published priors.
+
+WHY IT ISN'T ALREADY RUN
+    This needs network access to AACT or ClinicalTrials.gov. Run it yourself.
+
+SETUP
+    pip install pandas scikit-learn psycopg2-binary requests
+
+    Option A — AACT (richer; free account at
+    https://aact.ctti-clinicaltrials.org/users/sign_up):
+        export AACT_USER=... AACT_PASS=...
+        python3 pos_train.py --source aact
+
+    Option B — ClinicalTrials.gov API v2 (no account, fewer fields):
+        python3 pos_train.py --source ctgov --max-pages 400
+
+THE LABEL, AND ITS BIGGEST WEAKNESS
+    A program is (sponsor x intervention). A Phase 2 trial is labelled
+    successful if that same program later registered a Phase 3 trial. This is a
+    proxy for the BIO/Informa "phase transition" and it is imperfect in three
+    known ways, all of which bias the measured rate UPWARD:
+
+      1. RIGHT CENSORING. A 2024 Phase 2 trial has had little time to spawn a
+         Phase 3. Handled by --censor-year: trials starting after the cutoff are
+         dropped from training entirely.
+      2. UNREGISTERED PROGRAMS. Not every Phase 3 is registered promptly, and
+         some programs advance under a renamed intervention or a new sponsor
+         after a licensing deal. These look like failures. Partially handled by
+         fuzzy intervention matching.
+      3. SILENT DISCONTINUATION. A program that quietly stops looks identical
+         to one that is merely slow.
+
+    Because of (1)-(3) the absolute rates this produces should NOT be read as
+    the truth. Compare them to the BIO 2011-2020 priors printed at the end: if
+    your Phase 2->3 rate lands far above BIO's 28.9%, censoring is leaking. The
+    RANKING across therapeutic areas and features is the reliable output; the
+    levels are not. That is why pos.py blends rather than replaces.
+"""
+import argparse, json, os, re, sys, time
+from collections import defaultdict
+
+PHASE_ORDER = {"EARLY_PHASE1": 0, "PHASE1": 1, "PHASE1/PHASE2": 1, "PHASE2": 2,
+               "PHASE2/PHASE3": 2, "PHASE3": 3, "PHASE4": 4,
+               "Early Phase 1": 0, "Phase 1": 1, "Phase 1/Phase 2": 1, "Phase 2": 2,
+               "Phase 2/Phase 3": 2, "Phase 3": 3, "Phase 4": 4}
+
+TA_MAP = [  # (regex, therapeutic area label matching pos.BIO_2011_2020 keys)
+    (r"leukemia|lymphoma|myeloma|myelodysplas", "Heme-oncology"),
+    (r"carcinoma|neoplasm|cancer|tumou?r|sarcoma|melanoma|glioma", "Solid tumor"),
+    (r"alzheim|parkinson|epilep|multiple sclerosis|migraine|neuropath|amyotroph|huntington|dementia|seizure|stroke", "Neurology"),
+    (r"depress|schizophren|bipolar|anxiety|psychosis|addiction|autism|adhd", "Psychiatry"),
+    (r"diabet|obes|dyslipid|hyperlipid|metabolic syndrome|nash|mash|steatohepat", "Metabolic"),
+    (r"heart|cardiac|hypertens|atrial|coronary|thrombo|atheroscler|heart failure", "Cardiovascular"),
+    (r"arthritis|lupus|psoriasis|colitis|crohn|dermatitis|autoimmun|inflammat", "Immunology"),
+    (r"asthma|copd|pulmonary|respiratory|bronchiect|fibrosis", "Respiratory"),
+    (r"infect|hiv|hepatitis|influenza|covid|bacter|viral|malaria|tubercul", "Infectious"),
+    (r"vaccin|immuni[sz]ation|prophylaxis", "Vaccines"),
+    (r"anemia|haemophilia|hemophilia|thrombocytopen|sickle", "Hematology"),
+    (r"retina|macular|glaucoma|ophthalm|uveitis|corneal", "Ophthalmology"),
+    (r"thyroid|adrenal|pituitary|acromegal|growth hormone", "Endocrine"),
+]
+
+def map_ta(condition):
+    c = (condition or "").lower()
+    for pat, ta in TA_MAP:
+        if re.search(pat, c):
+            return ta
+    return "ALL"
+
+def norm_intervention(name):
+    """Loose normalisation so 'ABC-123', 'ABC123 tablets' and 'abc 123' collide."""
+    n = (name or "").lower()
+    n = re.sub(r"\b(tablet|capsule|injection|solution|placebo|mg|kg|iv|oral|sc|infusion)\b", " ", n)
+    n = re.sub(r"[^a-z0-9]+", "", n)
+    return n[:40]
+
+
+# ---------------------------------------------------------------------------
+# DATA SOURCES
+# ---------------------------------------------------------------------------
+def load_aact(limit=None):
+    import psycopg2, pandas as pd
+    user, pw = os.environ.get("AACT_USER"), os.environ.get("AACT_PASS")
+    if not user or not pw:
+        sys.exit("Set AACT_USER and AACT_PASS (free account at aact.ctti-clinicaltrials.org)")
+    conn = psycopg2.connect(host="aact-db.ctti-clinicaltrials.org", port=5432,
+                            dbname="aact", user=user, password=pw)
+    q = """
+    SELECT s.nct_id, s.phase, s.start_date, s.completion_date, s.overall_status,
+           s.enrollment, s.number_of_arms, d.allocation, d.masking, d.primary_purpose,
+           s.study_type, sp.name AS sponsor, sp.agency_class,
+           (SELECT string_agg(DISTINCT c.name, '|') FROM conditions c WHERE c.nct_id = s.nct_id) AS conditions,
+           (SELECT string_agg(DISTINCT i.name, '|') FROM interventions i
+              WHERE i.nct_id = s.nct_id AND i.intervention_type IN ('Drug','Biological')) AS drugs,
+           (SELECT count(*) FROM design_outcomes o WHERE o.nct_id = s.nct_id AND o.outcome_type='primary') AS n_primary
+    FROM studies s
+    JOIN sponsors sp ON sp.nct_id = s.nct_id AND sp.lead_or_collaborator = 'lead'
+    LEFT JOIN designs d ON d.nct_id = s.nct_id
+    WHERE s.study_type = 'INTERVENTIONAL'
+      AND s.phase IN ('PHASE1','PHASE1/PHASE2','PHASE2','PHASE2/PHASE3','PHASE3')
+      AND sp.agency_class IN ('INDUSTRY')
+      AND s.start_date IS NOT NULL
+    """
+    if limit:
+        q += f" LIMIT {int(limit)}"
+    df = pd.read_sql(q, conn); conn.close()
+    print(f"AACT: {len(df):,} industry-sponsored interventional trials")
+    return df
+
+
+def load_ctgov(max_pages=400, page_size=1000):
+    """ClinicalTrials.gov API v2 — no auth required."""
+    import requests, pandas as pd
+    base = "https://clinicaltrials.gov/api/v2/studies"
+    fields = ("NCTId|Phase|StartDate|CompletionDate|OverallStatus|EnrollmentCount|"
+              "NumberOfArms|DesignAllocation|DesignMasking|DesignPrimaryPurpose|"
+              "StudyType|LeadSponsorName|LeadSponsorClass|Condition|InterventionName")
+    rows, token = [], None
+    for i in range(max_pages):
+        p = {"pageSize": page_size, "fields": fields,
+             "filter.advanced": "AREA[StudyType]INTERVENTIONAL AND "
+                                "AREA[LeadSponsorClass]INDUSTRY AND "
+                                "AREA[Phase](PHASE1 OR PHASE2 OR PHASE3)"}
+        if token:
+            p["pageToken"] = token
+        r = requests.get(base, params=p, timeout=60)
+        r.raise_for_status()
+        j = r.json()
+        rows.extend(j.get("studies", []))
+        token = j.get("nextPageToken")
+        print(f"  page {i+1}: {len(rows):,} studies", end="\r")
+        if not token:
+            break
+        time.sleep(0.2)
+    print()
+    recs = []
+    for s in rows:
+        ps = s.get("protocolSection", {})
+        idm, des, sts = ps.get("identificationModule", {}), ps.get("designModule", {}), ps.get("statusModule", {})
+        di, cm = des.get("designInfo", {}), ps.get("conditionsModule", {})
+        recs.append({
+            "nct_id": idm.get("nctId"),
+            "phase": (des.get("phases") or [None])[0],
+            "start_date": (sts.get("startDateStruct") or {}).get("date"),
+            "completion_date": (sts.get("completionDateStruct") or {}).get("date"),
+            "overall_status": sts.get("overallStatus"),
+            "enrollment": (des.get("enrollmentInfo") or {}).get("count"),
+            "number_of_arms": None,
+            "allocation": di.get("allocation"), "masking": (di.get("maskingInfo") or {}).get("masking"),
+            "primary_purpose": di.get("primaryPurpose"), "study_type": des.get("studyType"),
+            "sponsor": ((ps.get("sponsorCollaboratorsModule") or {}).get("leadSponsor") or {}).get("name"),
+            "agency_class": ((ps.get("sponsorCollaboratorsModule") or {}).get("leadSponsor") or {}).get("class"),
+            "conditions": "|".join(cm.get("conditions") or []),
+            "drugs": "|".join(i.get("name","") for i in (ps.get("armsInterventionsModule") or {}).get("interventions", [])
+                              if i.get("type") in ("DRUG","BIOLOGICAL")),
+            "n_primary": None,
+        })
+    import pandas as pd
+    df = pd.DataFrame(recs)
+    print(f"ClinicalTrials.gov: {len(df):,} trials")
+    return df
+
+
+# ---------------------------------------------------------------------------
+# PATHS AND LABELS
+# ---------------------------------------------------------------------------
+def build_dataset(df, censor_year=2021):
+    import pandas as pd
+    df = df.copy()
+    df["phase_n"] = df["phase"].map(PHASE_ORDER)
+    df = df[df["phase_n"].notna() & df["drugs"].notna() & (df["drugs"] != "")]
+    df["year"] = pd.to_datetime(df["start_date"], errors="coerce").dt.year
+    df = df[df["year"].notna()]
+    df["ta"] = df["conditions"].fillna("").str.split("|").str[0].map(map_ta)
+    # keep digits — stripping them collapses distinct sponsors ("23andMe", "Sponsor001")
+    df["sponsor_key"] = df["sponsor"].fillna("").str.lower().str.replace(r"[^a-z0-9]", "", regex=True).str[:24]
+    df["drug_key"] = df["drugs"].fillna("").str.split("|").str[0].map(norm_intervention)
+    df = df[df["drug_key"].str.len() > 2]
+    df["program"] = df["sponsor_key"] + "::" + df["drug_key"]
+
+    # max phase ever reached by each program
+    maxph = df.groupby("program")["phase_n"].max().to_dict()
+    df["program_max_phase"] = df["program"].map(maxph)
+    df["advanced"] = (df["program_max_phase"] > df["phase_n"]).astype(int)
+
+    # sponsor scale: how many distinct programs the sponsor runs
+    scale = df.groupby("sponsor_key")["program"].nunique().to_dict()
+    df["sponsor_programs"] = df["sponsor_key"].map(scale)
+
+    n_all = len(df)
+    df = df[df["year"] <= censor_year]
+    print(f"  {n_all:,} trials -> {len(df):,} after censoring at {censor_year} "
+          f"(dropped {n_all-len(df):,} too recent to have observed a transition)")
+    return df
+
+
+FEATS = ["phase_n", "year", "enrollment_log", "n_arms", "randomized", "blinded",
+         "treatment_purpose", "sponsor_programs_log", "n_indications", "ta_code"]
+
+def featurize(df):
+    import numpy as np, pandas as pd
+    X = pd.DataFrame(index=df.index)
+    X["phase_n"] = df["phase_n"]
+    X["year"] = df["year"]
+    X["enrollment_log"] = np.log1p(pd.to_numeric(df["enrollment"], errors="coerce").fillna(0))
+    X["n_arms"] = pd.to_numeric(df["number_of_arms"], errors="coerce").fillna(2)
+    X["randomized"] = df["allocation"].fillna("").str.contains("RANDOM", case=False).astype(int)
+    X["blinded"] = (~df["masking"].fillna("NONE").str.contains("NONE", case=False)).astype(int)
+    X["treatment_purpose"] = df["primary_purpose"].fillna("").str.contains("TREAT", case=False).astype(int)
+    X["sponsor_programs_log"] = np.log1p(df["sponsor_programs"])
+    X["n_indications"] = df["conditions"].fillna("").str.count(r"\|") + 1
+    tas = sorted(df["ta"].unique())
+    X["ta_code"] = df["ta"].map({t: i for i, t in enumerate(tas)})
+    return X, tas
+
+
+def train(df, seed=0):
+    import numpy as np
+    from sklearn.ensemble import HistGradientBoostingClassifier
+    from sklearn.calibration import CalibratedClassifierCV
+    from sklearn.model_selection import GroupKFold
+    from sklearn.metrics import roc_auc_score, brier_score_loss
+
+    X, tas = featurize(df)
+    y = df["advanced"].values
+    groups = df["sponsor_key"].values   # group by sponsor: prevents a company's
+                                        # trials appearing in both train and test
+    n_groups = len(set(groups))
+    n_splits = min(5, n_groups)
+    if n_splits < 2:
+        raise ValueError(f"only {n_groups} distinct sponsor group(s) — cannot cross-validate. "
+                         "Check that sponsor names parsed correctly.")
+    if n_splits < 5:
+        print(f"  WARNING: only {n_groups} sponsor groups; using {n_splits}-fold")
+    aucs, briers, oof = [], [], np.zeros(len(y))
+    gkf = GroupKFold(n_splits=n_splits)
+    for tr, te in gkf.split(X, y, groups):
+        base = HistGradientBoostingClassifier(
+            max_iter=300, learning_rate=0.06, max_depth=5,
+            min_samples_leaf=40, l2_regularization=1.0, random_state=seed)
+        clf = CalibratedClassifierCV(base, method="isotonic", cv=3)
+        clf.fit(X.iloc[tr], y[tr])
+        p = clf.predict_proba(X.iloc[te])[:, 1]
+        oof[te] = p
+        aucs.append(roc_auc_score(y[te], p))
+        briers.append(brier_score_loss(y[te], p))
+
+    print(f"\n  grouped 5-fold CV (held out by sponsor)")
+    print(f"    ROC AUC     {np.mean(aucs):.3f} +/- {np.std(aucs):.3f}")
+    print(f"    Brier score {np.mean(briers):.4f}  (base rate {y.mean():.4f})")
+
+    # calibration check — the number that actually matters for a valuation model
+    print(f"\n  calibration (predicted vs observed advancement rate)")
+    qs = np.quantile(oof, np.linspace(0, 1, 11))
+    for i in range(10):
+        m = (oof >= qs[i]) & (oof <= qs[i+1])
+        if m.sum():
+            print(f"    decile {i+1:>2}  predicted {oof[m].mean():.3f}   observed {y[m].mean():.3f}   n={m.sum():,}")
+
+    final_base = HistGradientBoostingClassifier(
+        max_iter=300, learning_rate=0.06, max_depth=5,
+        min_samples_leaf=40, l2_regularization=1.0, random_state=seed)
+    final = CalibratedClassifierCV(final_base, method="isotonic", cv=3).fit(X, y)
+    return final, X, tas, float(np.mean(aucs)), float(np.mean(briers)), oof
+
+
+BIO_PRIOR_TRANSITION = {  # BIO 2011-2020, for the sanity comparison
+    1: ("Ph1->Ph2", 0.520), 2: ("Ph2->Ph3", 0.289), 3: ("Ph3->filing", 0.578)}
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--source", choices=["aact", "ctgov"], default="ctgov")
+    ap.add_argument("--censor-year", type=int, default=2021)
+    ap.add_argument("--max-pages", type=int, default=400)
+    ap.add_argument("--limit", type=int, default=None)
+    ap.add_argument("--out", default="pos_model.json")
+    ap.add_argument("--blend-weight", type=float, default=0.5,
+                    help="weight on the trained estimate when blending with the published prior")
+    a = ap.parse_args()
+
+    df = load_aact(a.limit) if a.source == "aact" else load_ctgov(a.max_pages)
+    df = build_dataset(df, a.censor_year)
+    model, X, tas, auc, brier, oof = train(df)
+
+    # empirical transition rates, and the honest comparison to BIO
+    print(f"\n  observed transition rates vs BIO 2011-2020 prior")
+    emp = {}
+    for ph, (label, prior) in BIO_PRIOR_TRANSITION.items():
+        sub = df[df["phase_n"] == ph]
+        if len(sub) < 50:
+            continue
+        r = float(sub["advanced"].mean())
+        emp[label] = {"observed": round(r, 4), "bio_prior": prior, "n": int(len(sub))}
+        flag = "  <-- CENSORING LEAK?" if r > prior * 1.4 else ""
+        print(f"    {label:<12} observed {r:.3f}   BIO {prior:.3f}   n={len(sub):,}{flag}")
+
+    by_ta = {}
+    for ta, sub in df.groupby("ta"):
+        if len(sub) < 100:
+            continue
+        by_ta[ta] = {"n": int(len(sub)), "rate": round(float(sub["advanced"].mean()), 4)}
+    print(f"\n  advancement rate by therapeutic area (ranking is the reliable output, not the level)")
+    for ta, v in sorted(by_ta.items(), key=lambda kv: -kv[1]["rate"]):
+        print(f"    {ta:<18} {v['rate']:.3f}  n={v['n']:,}")
+
+    out = {
+        "trained_on": a.source, "n_trials": int(len(df)), "censor_year": a.censor_year,
+        "cv_roc_auc": round(auc, 4), "cv_brier": round(brier, 4),
+        "base_rate": round(float(df["advanced"].mean()), 4),
+        "transitions_vs_prior": emp, "by_therapeutic_area": by_ta,
+        "therapeutic_areas": tas, "blend_weight": a.blend_weight,
+        "caveat": ("Absolute rates are biased upward by right-censoring, unregistered "
+                   "follow-on trials, and silent discontinuation. Use the cross-area "
+                   "ranking, not the levels. pos.py blends rather than replaces."),
+    }
+    with open(a.out, "w") as f:
+        json.dump(out, f, indent=1)
+    print(f"\n  wrote {a.out} — pos.py will pick it up automatically")
+
+
+if __name__ == "__main__":
+    main()
