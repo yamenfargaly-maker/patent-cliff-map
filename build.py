@@ -1,6 +1,6 @@
 import json
 
-D = json.load(open("/home/claude/patent-cliff-map/data.json"))
+D = json.load(open("data.json"))
 
 HTML = r"""<!doctype html>
 <html lang="en"><head>
@@ -431,5 +431,5 @@ rep = {
 }
 for k, v in rep.items():
     HTML = HTML.replace(k, v)
-open("/home/claude/patent-cliff-map/patent-cliff-map.html", "w").write(HTML)
+open("patent-cliff-map.html", "w").write(HTML)
 print("built", len(HTML), "bytes")

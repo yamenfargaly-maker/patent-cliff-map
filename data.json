@@ -380,7 +380,7 @@
  ],
  "targets": [
   {
-   "pos": 60.3,
+   "pos": 60.7,
    "pos_ta": "Solid tumor",
    "pos_phase": "Ph3",
    "mods": [
@@ -389,8 +389,8 @@
     "mab"
    ],
    "peak": 6000,
-   "rnpv": 5.15,
-   "cover": 35.5,
+   "rnpv": 5.19,
+   "cover": 35.7,
    "pos_capped": false,
    "ticker": "SMMT",
    "name": "Summit Therapeutics",
@@ -639,7 +639,7 @@
    "thesis": "Only approved MASH drug, >50k patients. Roche and Novo both bought MASH Ph3 assets."
   },
   {
-   "pos": 67.9,
+   "pos": 68.5,
    "pos_ta": "Immunology",
    "pos_phase": "Ph3",
    "mods": [
@@ -647,8 +647,8 @@
     "mab"
    ],
    "peak": 2500,
-   "rnpv": 2.25,
-   "cover": 18.8,
+   "rnpv": 2.27,
+   "cover": 19.0,
    "pos_capped": false,
    "ticker": "IMVT",
    "name": "Immunovant",
@@ -715,7 +715,7 @@
    "thesis": "ASO platform with three commercial assets. Long-standing Biogen partner."
   },
   {
-   "pos": 81.6,
+   "pos": 80.8,
    "pos_ta": "Neurology",
    "pos_phase": "Filed",
    "mods": [
@@ -724,8 +724,8 @@
     "mab"
    ],
    "peak": 1200,
-   "rnpv": 1.69,
-   "cover": 18.7,
+   "rnpv": 1.67,
+   "cover": 18.5,
    "pos_capped": false,
    "ticker": "SRRK",
    "name": "Scholar Rock",
@@ -826,7 +826,7 @@
    "thesis": "CNS commercial platform. J&J paid $14.6B for Intra-Cellular on the same logic."
   },
   {
-   "pos": 41.6,
+   "pos": 42.2,
    "pos_ta": "Immunology",
    "pos_phase": "Ph2",
    "mods": [
@@ -834,8 +834,8 @@
     "genetic_evidence"
    ],
    "peak": 3000,
-   "rnpv": 1.36,
-   "cover": 9.3,
+   "rnpv": 1.39,
+   "cover": 9.4,
    "pos_capped": false,
    "ticker": "KYMR",
    "name": "Kymera",
@@ -1007,15 +1007,15 @@
    "thesis": "Platform + commercial ATTR. Down 47% y/y on a guidance cut \u2014 cheapest it has been."
   },
   {
-   "pos": 60.4,
+   "pos": 64.0,
    "pos_ta": "Metabolic",
    "pos_phase": "Ph3",
    "mods": [
     "lead_indication"
    ],
    "peak": 3800,
-   "rnpv": 3.27,
-   "cover": 58.8,
+   "rnpv": 3.47,
+   "cover": 62.4,
    "pos_capped": false,
    "ticker": "GPCR",
    "name": "Structure Therapeutics",
@@ -1047,7 +1047,7 @@
    "thesis": "Oral small-molecule GLP-1. Analyst peak-sales estimate $3.8B."
   },
   {
-   "pos": 63.7,
+   "pos": 64.2,
    "pos_ta": "Solid tumor",
    "pos_phase": "Ph3",
    "mods": [
@@ -1056,8 +1056,8 @@
     "biomarker_select"
    ],
    "peak": 4000,
-   "rnpv": 3.63,
-   "cover": 6.5,
+   "rnpv": 3.66,
+   "cover": 6.6,
    "pos_capped": false,
    "ticker": "RVMD",
    "name": "Revolution Medicines",
@@ -1084,15 +1084,15 @@
    "thesis": "The only scaled RAS franchise. Merck talks collapsed on price in 2026."
   },
   {
-   "pos": 60.4,
+   "pos": 64.0,
    "pos_ta": "Metabolic",
    "pos_phase": "Ph3",
    "mods": [
     "lead_indication"
    ],
    "peak": 3000,
-   "rnpv": 2.58,
-   "cover": 46.5,
+   "rnpv": 2.74,
+   "cover": 49.3,
    "pos_capped": false,
    "ticker": "VKTX",
    "name": "Viking Therapeutics",
@@ -1124,15 +1124,15 @@
    "thesis": "Ph3 fully enrolled. Pfizer paid >$10B for Metsera at Ph2b."
   },
   {
-   "pos": 78.5,
+   "pos": 77.6,
    "pos_ta": "Neurology",
    "pos_phase": "Filed",
    "mods": [
     "lead_indication"
    ],
    "peak": 1200,
-   "rnpv": 1.62,
-   "cover": 11.0,
+   "rnpv": 1.61,
+   "cover": 10.9,
    "pos_capped": false,
    "ticker": "PRAX",
    "name": "Praxis Precision",
@@ -1197,7 +1197,7 @@
    "thesis": "Commercial precision-oncology bolt-on at a sub-$2.5B cap."
   },
   {
-   "pos": 11.1,
+   "pos": 11.3,
    "pos_ta": "Solid tumor",
    "pos_phase": "Ph1",
    "mods": [
@@ -1205,7 +1205,7 @@
    ],
    "peak": 1000,
    "rnpv": 0.11,
-   "cover": 5.3,
+   "cover": 5.4,
    "pos_capped": false,
    "ticker": "JANX",
    "name": "Janux",
@@ -1270,15 +1270,15 @@
    "thesis": "Approved drug, $293M enterprise value. Trades at a fraction of cash-adjusted worth."
   },
   {
-   "pos": 23.1,
+   "pos": 23.8,
    "pos_ta": "Psychiatry",
    "pos_phase": "Ph2",
    "mods": [
     "lead_indication"
    ],
    "peak": 1500,
-   "rnpv": 0.35,
-   "cover": 42.5,
+   "rnpv": 0.36,
+   "cover": 43.7,
    "pos_capped": false,
    "ticker": "MPLT",
    "name": "MapLight",

@@ -237,25 +237,6 @@ def build_dataset(df, censor_year=2021):
     scale = df.groupby("sponsor_key")["program"].nunique().to_dict()
     df["sponsor_programs"] = df["sponsor_key"].map(scale)
 
-    # STRUCTURAL ZERO GUARD. Trials at the highest phase the extract contains can
-    # never be labelled "advanced", so they are forced negatives by construction.
-    top = df["phase_n"].max()
-    n_top = int((df["phase_n"] == top).sum())
-    if n_top:
-        rate_top = float(df.loc[df["phase_n"] == top, "advanced"].mean())
-        if rate_top < 0.01:
-            print(f"  DROPPING {n_top:,} trials at phase_n={int(top)} - observed advancement "
-                  f"{rate_top:.3f}, i.e. no higher phase exists in this extract.")
-            df = df[df["phase_n"] < top]
-
-    multi = df.groupby("program")["phase_n"].nunique()
-    frac_multi = float((multi > 1).mean())
-    print(f"  program coverage: {frac_multi:.1%} of programs appear at more than one phase")
-    if frac_multi < 0.15:
-        print("    WARNING: very low. This extract is a filtered subset, so next-phase\n"
-              "    trials often sit OUTSIDE the file and read as failure. Absolute rates\n"
-              "    are biased DOWNWARD. Re-pull without the condition filter for levels.")
-
     n_all = len(df)
     df = df[df["year"] <= censor_year]
     print(f"  {n_all:,} trials -> {len(df):,} after censoring at {censor_year} "
@@ -327,11 +308,11 @@ def train(df, seed=0):
 
     # calibration check — the number that actually matters for a valuation model
     print(f"\n  calibration (predicted vs observed advancement rate)")
-    order = np.argsort(oof, kind="stable")
-    for i, idx in enumerate(np.array_split(order, 10)):
-        if len(idx):
-            print(f"    decile {i+1:>2}  predicted {oof[idx].mean():.3f}   "
-                  f"observed {y[idx].mean():.3f}   n={len(idx):,}")
+    qs = np.quantile(oof, np.linspace(0, 1, 11))
+    for i in range(10):
+        m = (oof >= qs[i]) & (oof <= qs[i+1])
+        if m.sum():
+            print(f"    decile {i+1:>2}  predicted {oof[m].mean():.3f}   observed {y[m].mean():.3f}   n={m.sum():,}")
 
     final_base = HistGradientBoostingClassifier(
         max_iter=300, learning_rate=0.06, max_depth=5,
@@ -372,9 +353,7 @@ def main():
             continue
         r = float(sub["advanced"].mean())
         emp[label] = {"observed": round(r, 4), "bio_prior": prior, "n": int(len(sub))}
-        flag = ("  <-- CENSORING LEAK (too high)" if r > prior * 1.4 else
-                "  <-- SUBSET BIAS (too low: follow-on trials missing from this extract)"
-                if r < prior * 0.6 else "")
+        flag = "  <-- CENSORING LEAK?" if r > prior * 1.4 else ""
         print(f"    {label:<12} observed {r:.3f}   BIO {prior:.3f}   n={len(sub):,}{flag}")
 
     by_ta = {}

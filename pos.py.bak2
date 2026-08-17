@@ -70,8 +70,7 @@ MODIFIERS = {
     "breakthrough":      (1.35, (2,3),     "DAMPED from the reported 72% BTD approval rate, which is severely selection-confounded"),
 }
 
-DAMPING = 0.55         # each modifier's log-odds effect is scaled by this before stacking
-TRAINED_DAMPING = 0.50 # how hard the trained model's area ranking may move a prior
+DAMPING = 0.55   # each modifier's log-odds effect is scaled by this before stacking
 MAX_UPLIFT = 3.5 # hard ceiling on combined uplift vs the unmodified TA prior
 PHASES = ["Preclinical", "Ph1", "Ph2", "Ph3", "Filed", "Commercial"]
 
@@ -128,17 +127,11 @@ def pos(ta, phase, mods=(), drift=True, trained=None):
     if drift:
         val *= DRIFT
 
-    # Blend using ONLY the trained model's cross-area ranking, never its levels.
+    # blend with a trained empirical estimate if one exists
     blended = None
     if trained is not None:
-        by = trained.get("by_therapeutic_area", {})
-        base = trained.get("base_rate")
-        row = by.get(ta)
-        if row and base and 0 < base < 1:
-            r = min(max(row["rate"], EPS), 1 - EPS)
-            odds_ratio = (r / (1 - r)) / (base / (1 - base))
-            w = trained.get("blend_weight", 0.5)
-            blended = _expit(_logit(val) + w * TRAINED_DAMPING * math.log(odds_ratio))
+        w = trained.get("weight", 0.5)
+        blended = _expit((1 - w) * _logit(val) + w * _logit(trained["p"]))
 
     return (blended if blended is not None else min(val, 0.99)), {
         "ta": ta, "phase": phase, "base_transitions": base, "adjusted": adj,

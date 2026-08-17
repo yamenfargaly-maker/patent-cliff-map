@@ -115,30 +115,6 @@ def load_aact(limit=None):
     return df
 
 
-def load_local(data_dir):
-    """Read a local ClinicalTrials.gov extract (the ctgov_out/ layout)."""
-    import pandas as pd, os
-    sp = os.path.join(data_dir, "studies.csv")
-    ip = os.path.join(data_dir, "interventions.csv")
-    for p in (sp, ip):
-        if not os.path.exists(p):
-            sys.exit(f"missing {p} - point --data-dir at the folder holding studies.csv")
-    st = pd.read_csv(sp, low_memory=False)
-    iv = pd.read_csv(ip, low_memory=False)
-    iv = iv[iv["type"].isin(["DRUG", "BIOLOGICAL"])]
-    drugs = (iv.groupby("nct_id")["name"]
-               .apply(lambda s: "|".join(sorted(set(str(x) for x in s if pd.notna(x)))))
-               .rename("drugs"))
-    df = st.merge(drugs, on="nct_id", how="left")
-    df = df.rename(columns={"phases": "phase", "lead_sponsor": "sponsor",
-                            "lead_sponsor_class": "agency_class"})
-    df["study_type"] = "INTERVENTIONAL"
-    df["number_of_arms"] = None
-    df["n_primary"] = None
-    print(f"local extract: {len(df):,} studies, {iv['nct_id'].nunique():,} with a drug/biologic intervention")
-    return df
-
-
 def load_ctgov(max_pages=400, page_size=1000):
     """ClinicalTrials.gov API v2 — no auth required."""
     import requests, pandas as pd
@@ -214,47 +190,9 @@ def build_dataset(df, censor_year=2021):
     df["program_max_phase"] = df["program"].map(maxph)
     df["advanced"] = (df["program_max_phase"] > df["phase_n"]).astype(int)
 
-    # HARD NEGATIVES. "Did a later-phase trial appear" cannot tell a program that
-    # failed from one that is merely slow. A termination for futility, lack of
-    # efficacy or safety is an OBSERVED failure and overrides the proxy.
-    if "why_stopped" in df.columns:
-        ws = df["why_stopped"].fillna("").str.lower()
-        failure = ws.str.contains(
-            r"futility|lack of efficacy|efficacy|did not meet|failed|safety|toxicit|"
-            r"adverse|risk.benefit|benefit.risk|negative|no benefit|interim analysis",
-            regex=True, na=False)
-        operational = ws.str.contains(
-            r"accrual|enrol|recruit|funding|business|strateg|sponsor decision|"
-            r"covid|pandemic|supply|administrat|prioriti", regex=True, na=False)
-        hard_neg = failure & ~operational
-        n_flip = int((hard_neg & (df["advanced"] == 1)).sum())
-        df.loc[hard_neg, "advanced"] = 0
-        print(f"  why_stopped: {int(hard_neg.sum()):,} observed failures "
-              f"({n_flip:,} relabelled from 'advanced' to failure), "
-              f"{int(operational.sum()):,} operational stops left alone")
-
     # sponsor scale: how many distinct programs the sponsor runs
     scale = df.groupby("sponsor_key")["program"].nunique().to_dict()
     df["sponsor_programs"] = df["sponsor_key"].map(scale)
-
-    # STRUCTURAL ZERO GUARD. Trials at the highest phase the extract contains can
-    # never be labelled "advanced", so they are forced negatives by construction.
-    top = df["phase_n"].max()
-    n_top = int((df["phase_n"] == top).sum())
-    if n_top:
-        rate_top = float(df.loc[df["phase_n"] == top, "advanced"].mean())
-        if rate_top < 0.01:
-            print(f"  DROPPING {n_top:,} trials at phase_n={int(top)} - observed advancement "
-                  f"{rate_top:.3f}, i.e. no higher phase exists in this extract.")
-            df = df[df["phase_n"] < top]
-
-    multi = df.groupby("program")["phase_n"].nunique()
-    frac_multi = float((multi > 1).mean())
-    print(f"  program coverage: {frac_multi:.1%} of programs appear at more than one phase")
-    if frac_multi < 0.15:
-        print("    WARNING: very low. This extract is a filtered subset, so next-phase\n"
-              "    trials often sit OUTSIDE the file and read as failure. Absolute rates\n"
-              "    are biased DOWNWARD. Re-pull without the condition filter for levels.")
 
     n_all = len(df)
     df = df[df["year"] <= censor_year]
@@ -264,8 +202,7 @@ def build_dataset(df, censor_year=2021):
 
 
 FEATS = ["phase_n", "year", "enrollment_log", "n_arms", "randomized", "blinded",
-         "treatment_purpose", "sponsor_programs_log", "n_indications", "ta_code",
-         "n_locations_log", "has_results", "industry_sponsor"]
+         "treatment_purpose", "sponsor_programs_log", "n_indications", "ta_code"]
 
 def featurize(df):
     import numpy as np, pandas as pd
@@ -281,12 +218,6 @@ def featurize(df):
     X["n_indications"] = df["conditions"].fillna("").str.count(r"\|") + 1
     tas = sorted(df["ta"].unique())
     X["ta_code"] = df["ta"].map({t: i for i, t in enumerate(tas)})
-    X["n_locations_log"] = (np.log1p(pd.to_numeric(df.get("n_locations"), errors="coerce").fillna(1))
-                            if "n_locations" in df.columns else 0.0)
-    X["has_results"] = (df["has_results"].astype(str).str.lower().eq("true").astype(int)
-                        if "has_results" in df.columns else 0)
-    X["industry_sponsor"] = (df["agency_class"].fillna("").str.upper().eq("INDUSTRY").astype(int)
-                             if "agency_class" in df.columns else 1)
     return X, tas
 
 
@@ -327,11 +258,11 @@ def train(df, seed=0):
 
     # calibration check — the number that actually matters for a valuation model
     print(f"\n  calibration (predicted vs observed advancement rate)")
-    order = np.argsort(oof, kind="stable")
-    for i, idx in enumerate(np.array_split(order, 10)):
-        if len(idx):
-            print(f"    decile {i+1:>2}  predicted {oof[idx].mean():.3f}   "
-                  f"observed {y[idx].mean():.3f}   n={len(idx):,}")
+    qs = np.quantile(oof, np.linspace(0, 1, 11))
+    for i in range(10):
+        m = (oof >= qs[i]) & (oof <= qs[i+1])
+        if m.sum():
+            print(f"    decile {i+1:>2}  predicted {oof[m].mean():.3f}   observed {y[m].mean():.3f}   n={m.sum():,}")
 
     final_base = HistGradientBoostingClassifier(
         max_iter=300, learning_rate=0.06, max_depth=5,
@@ -346,9 +277,7 @@ BIO_PRIOR_TRANSITION = {  # BIO 2011-2020, for the sanity comparison
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--source", choices=["aact", "ctgov", "local"], default="ctgov")
-    ap.add_argument("--data-dir", default="ctgov_out",
-                    help="folder with studies.csv and interventions.csv (--source local)")
+    ap.add_argument("--source", choices=["aact", "ctgov"], default="ctgov")
     ap.add_argument("--censor-year", type=int, default=2021)
     ap.add_argument("--max-pages", type=int, default=400)
     ap.add_argument("--limit", type=int, default=None)
@@ -357,9 +286,7 @@ def main():
                     help="weight on the trained estimate when blending with the published prior")
     a = ap.parse_args()
 
-    df = (load_aact(a.limit) if a.source == "aact" else
-          load_local(a.data_dir) if a.source == "local" else
-          load_ctgov(a.max_pages))
+    df = load_aact(a.limit) if a.source == "aact" else load_ctgov(a.max_pages)
     df = build_dataset(df, a.censor_year)
     model, X, tas, auc, brier, oof = train(df)
 
@@ -372,9 +299,7 @@ def main():
             continue
         r = float(sub["advanced"].mean())
         emp[label] = {"observed": round(r, 4), "bio_prior": prior, "n": int(len(sub))}
-        flag = ("  <-- CENSORING LEAK (too high)" if r > prior * 1.4 else
-                "  <-- SUBSET BIAS (too low: follow-on trials missing from this extract)"
-                if r < prior * 0.6 else "")
+        flag = "  <-- CENSORING LEAK?" if r > prior * 1.4 else ""
         print(f"    {label:<12} observed {r:.3f}   BIO {prior:.3f}   n={len(sub):,}{flag}")
 
     by_ta = {}
